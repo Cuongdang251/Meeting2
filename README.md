@@ -85,29 +85,7 @@ Mật khẩu cho **tất cả** tài khoản demo: **`123456`**
 | QL_C | Quản lý phòng họp |
 | ADMIN | Admin |
 
-## 1. Cài đặt SQL Server & tạo CSDL bằng SSMS
-1. Cài **SQL Server** (bản Express là đủ) và **SQL Server Management Studio (SSMS)**.
-2. Mở SSMS, kết nối instance (VD: `localhost\SQLEXPRESS`).
-3. Mở file `db/schema.sql`, nhấn **Execute (F5)** — script tự tạo database
-   `xyz_meeting_room`, đầy đủ bảng (`users`, `rooms`, `equipment`,
-   `room_equipment`, `meetings`, `meeting_participants`, `notifications`) và
-   dữ liệu mẫu (đã bao gồm mật khẩu đã băm sẵn cho các tài khoản demo).
 
-## 2. Cài driver ODBC (bắt buộc để Python kết nối SQL Server)
-**Windows:** tải **"ODBC Driver 18 for SQL Server"**:
-https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server
-
-**macOS:**
-```bash
-brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
-HOMEBREW_ACCEPT_EULA=Y brew install msodbcsql18
-```
-
-**Ubuntu/Debian:**
-```bash
-curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-sudo apt-get update && sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
 ```
 
 ## 3. Kết nối code Python với SSMS
