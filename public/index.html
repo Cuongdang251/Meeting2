@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Công ty Xyz - Hệ thống đặt lịch họp</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ NAVBAR ============ -->
+<nav class="navbar">
+  <div class="nav-left">
+    <span class="brand">Công ty Xyz</span>
+    <a href="#" class="nav-link main-tab" data-module="employee">Nhân viên</a>
+    <a href="#" class="nav-link main-tab" data-module="rooms">Quản lý phòng họp</a>
+    <a href="#" class="nav-link main-tab" data-module="admin">Admin</a>
+  </div>
+  <div class="nav-right" id="userArea"></div>
+</nav>
+
+<main class="container">
+
+  <!-- =========================================================
+       ĐĂNG NHẬP (Chức năng chung - Xác thực tài khoản)
+       ========================================================= -->
+  <section id="view-login" class="view">
+    <div class="card login-card">
+      <h3 class="section-title">Đăng nhập hệ thống</h3>
+      <div class="form-group"><label>Mã nhân viên *</label><input id="loginCode" placeholder="VD: NV_A"></div>
+      <div class="form-group"><label>Mật khẩu *</label><input id="loginPassword" type="password" placeholder="••••••"></div>
+      <div class="form-error" id="loginError"></div>
+      <button class="btn btn-primary full-width" id="btnLogin">Đăng nhập</button>
+      <div class="hint" style="margin-top:10px">
+        Tài khoản demo (mật khẩu chung: <b>123456</b>):<br>
+        NV_A, NV_B — Nhân viên &nbsp;|&nbsp; QL_C — Quản lý phòng họp &nbsp;|&nbsp; ADMIN — Admin
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       MODULE: NHÂN VIÊN (WBS 2.5.1)
+       ========================================================= -->
+  <section id="module-employee" class="module-section" style="display:none">
+    <div class="card monitor-links">
+      <button class="link-btn sub-tab" data-view="emp-calendar">🗓 Lịch họp cá nhân</button>
+      <button class="link-btn sub-tab" data-view="emp-create">➕ Tạo cuộc họp mới</button>
+      <button class="link-btn sub-tab" data-view="emp-created">📋 Cuộc họp đã tạo</button>
+      <button class="link-btn sub-tab" data-view="emp-invitations">✉ Lời mời họp</button>
+      <button class="link-btn sub-tab" data-view="emp-profile">👤 Hồ sơ / Đổi mật khẩu</button>
+    </div>
+
+    <!-- 1. Xem lịch họp (Ngày/Tuần/Tháng) + Lọc lịch -->
+    <section id="view-emp-calendar" class="view" style="display:none">
+      <h3 class="section-title">Lịch họp cá nhân</h3>
+      <div class="card">
+        <div class="toolbar filters">
+          <select id="empView" class="select-box">
+            <option value="day">Theo ngày</option>
+            <option value="week" selected>Theo tuần</option>
+            <option value="month">Theo tháng</option>
+          </select>
+          <input type="date" id="empDate" class="select-box">
+          <select id="empOrganizerFilter" class="select-box"></select>
+          <select id="empRoomFilter" class="select-box"></select>
+        </div>
+        <div class="hint" id="empRangeLabel" style="margin-bottom:10px"></div>
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Tiêu đề</th><th>Phòng</th>
+            <th>Thời gian</th><th>Người tổ chức</th><th>Phản hồi của tôi</th>
+          </tr></thead>
+          <tbody id="empCalendarBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2. Tạo cuộc họp mới (dùng chung form Sửa cuộc họp) -->
+    <section id="view-emp-create" class="view" style="display:none">
+      <h3 class="section-title" id="empCreateHeader">Tạo cuộc họp mới</h3>
+      <div class="card" style="max-width:520px">
+        <div class="form-group"><label>Tiêu đề cuộc họp *</label><input id="empTitle" placeholder="VD: Họp Sprint Review"></div>
+        <div class="form-group"><label>Phòng họp *</label><select id="empRoomSelect" class="select-box full"></select></div>
+        <div class="form-group"><label>Thời gian bắt đầu *</label><input type="datetime-local" id="empStart" class="select-box full"></div>
+        <div class="form-group"><label>Thời gian kết thúc *</label><input type="datetime-local" id="empEnd" class="select-box full"></div>
+        <div class="form-group">
+          <label>Mời người tham gia</label>
+          <select id="empParticipants" class="select-box full" multiple size="6"></select>
+          <div class="hint">Hệ thống sẽ tự động kiểm tra trùng phòng và người tham gia có đang bận hay không.</div>
+        </div>
+        <div class="form-error" id="empCreateError"></div>
+        <button class="btn btn-primary" id="btnEmpSave">Tạo cuộc họp</button>
+        <button class="btn btn-light" id="btnEmpCancelEdit" style="display:none">Hủy chỉnh sửa</button>
+      </div>
+    </section>
+
+    <!-- 3. Quản lý cuộc họp đã tạo -->
+    <section id="view-emp-created" class="view" style="display:none">
+      <h3 class="section-title">Cuộc họp đã tạo</h3>
+      <div class="card">
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Tiêu đề</th><th>Phòng</th><th>Thời gian</th>
+            <th>Số người mời</th><th style="width:110px">Trạng thái</th><th style="width:140px">Thao tác</th>
+          </tr></thead>
+          <tbody id="empCreatedBody"></tbody>
+        </table>
+        <div class="pagination" id="empCreatedPagination"></div>
+      </div>
+    </section>
+
+    <!-- 4. Phản hồi lời mời -->
+    <section id="view-emp-invitations" class="view" style="display:none">
+      <h3 class="section-title">Lời mời họp</h3>
+      <div class="card">
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Tiêu đề</th><th>Phòng</th><th>Thời gian</th>
+            <th>Người tổ chức</th><th style="width:120px">Phản hồi</th><th style="width:160px">Thao tác</th>
+          </tr></thead>
+          <tbody id="empInvitationsBody"></tbody>
+        </table>
+        <div class="pagination" id="empInvitationsPagination"></div>
+      </div>
+    </section>
+
+    <!-- 5. Hồ sơ cá nhân / Đổi mật khẩu -->
+    <section id="view-emp-profile" class="view" style="display:none">
+      <h3 class="section-title">Hồ sơ cá nhân</h3>
+      <div class="card" style="max-width:420px; margin-bottom:20px">
+        <div class="form-group"><label>Họ tên *</label><input id="profileFullName"></div>
+        <div class="form-group"><label>Email</label><input id="profileEmail"></div>
+        <div class="form-error" id="profileError"></div>
+        <button class="btn btn-primary" id="btnSaveProfile">Cập nhật hồ sơ</button>
+      </div>
+
+      <h3 class="section-title">Đổi mật khẩu</h3>
+      <div class="card" style="max-width:420px">
+        <div class="form-group"><label>Mật khẩu hiện tại *</label><input type="password" id="oldPassword"></div>
+        <div class="form-group"><label>Mật khẩu mới *</label><input type="password" id="newPassword"></div>
+        <div class="form-error" id="passwordError"></div>
+        <button class="btn btn-primary" id="btnChangePassword">Đổi mật khẩu</button>
+      </div>
+    </section>
+  </section>
+
+  <!-- =========================================================
+       MODULE: QUẢN LÝ PHÒNG HỌP (WBS 2.5.2)
+       ========================================================= -->
+  <section id="module-rooms" class="module-section" style="display:none">
+    <div class="card monitor-links">
+      <button class="link-btn sub-tab" data-view="room-list">🏠 Danh sách phòng</button>
+      <button class="link-btn sub-tab" data-view="usage-history">🕐 Lịch sử sử dụng phòng</button>
+      <button class="link-btn sub-tab" data-view="booking-history">📅 Lịch sử đặt phòng sắp tới</button>
+      <button class="link-btn sub-tab" data-view="availability">🧭 Thời gian trống của các phòng</button>
+    </div>
+
+    <!-- 1. Danh sách phòng họp -->
+    <section id="view-room-list" class="view" style="display:none">
+      <h3 class="section-title">Danh sách phòng họp</h3>
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box">
+            <span class="icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Nhập tên phòng cần tìm">
+          </div>
+          <button class="btn btn-primary" id="btnOpenAdd">+ Thêm Phòng Họp</button>
+        </div>
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Mã Phòng</th><th>Tên Phòng</th>
+            <th>Số Chỗ Ngồi</th><th>Thiết Bị</th><th style="width:110px">Trạng Thái</th><th style="width:130px">Thao Tác</th>
+          </tr></thead>
+          <tbody id="roomTableBody"></tbody>
+        </table>
+        <div class="pagination" id="roomPagination"></div>
+      </div>
+    </section>
+
+    <!-- 5. Lịch sử sử dụng phòng -->
+    <section id="view-usage-history" class="view" style="display:none">
+      <h3 class="section-title">Lịch sử sử dụng phòng</h3>
+      <div class="card">
+        <div class="page-header">Xem lịch sử đã sử dụng phòng</div>
+        <div class="breadcrumb">QUẢN LÝ THÔNG TIN PHÒNG &nbsp;&gt;&nbsp; LỊCH SỬ SỬ DỤNG PHÒNG</div>
+        <div class="toolbar"><select id="usageRoomFilter" class="select-box"></select></div>
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Tên Phòng</th><th>Ngày</th><th>Giờ</th><th>Tên cuộc họp</th><th>Người tạo</th>
+          </tr></thead>
+          <tbody id="usageTableBody"></tbody>
+        </table>
+        <div class="pagination" id="usagePagination"></div>
+      </div>
+    </section>
+
+    <!-- 6. Lịch sử đặt phòng (sắp tới) -->
+    <section id="view-booking-history" class="view" style="display:none">
+      <h3 class="section-title">Lịch sử đặt phòng</h3>
+      <div class="card">
+        <div class="page-header">Xem lịch đặt phòng sắp tới</div>
+        <div class="breadcrumb">QUẢN LÝ THÔNG TIN PHÒNG &nbsp;&gt;&nbsp; LỊCH SỬ ĐẶT PHÒNG SẮP TỚI</div>
+        <div class="toolbar filters">
+          <label>📅 Chọn phòng: <select id="bookingRoomFilter" class="select-box"></select></label>
+          <label>📅 Từ ngày: <input type="date" id="bookingFrom" class="select-box"></label>
+          <label>📅 Đến ngày: <input type="date" id="bookingTo" class="select-box"></label>
+        </div>
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Tên Phòng</th><th>Ngày</th><th>Giờ</th><th>Tên cuộc họp</th><th>Người tạo</th>
+          </tr></thead>
+          <tbody id="bookingTableBody"></tbody>
+        </table>
+        <div class="pagination" id="bookingPagination"></div>
+      </div>
+    </section>
+
+    <!-- 7. Thời gian trống của các phòng -->
+    <section id="view-availability" class="view" style="display:none">
+      <h3 class="section-title">Xem thời gian trống của các phòng</h3>
+      <div class="card">
+        <div class="page-header">Xem thời gian trống của các phòng</div>
+        <div class="breadcrumb">QUẢN LÝ THÔNG TIN PHÒNG &nbsp;&gt;&nbsp; THỜI GIAN TRỐNG CỦA CÁC PHÒNG</div>
+        <div class="toolbar">
+          <button class="btn btn-light" id="btnPrevDay">&lt; Ngày trước</button>
+          <input type="date" id="availDate" class="select-box">
+          <button class="btn btn-light" id="btnNextDay">Ngày sau &gt;</button>
+        </div>
+        <div class="timeline-wrapper">
+          <table class="grid-table timeline-table" id="timelineTable">
+            <thead><tr id="timelineHeaderRow"><th style="width:140px">Tên Phòng</th></tr></thead>
+            <tbody id="timelineBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- =========================================================
+       MODULE: ADMIN (WBS 2.5.3)
+       ========================================================= -->
+  <section id="module-admin" class="module-section" style="display:none">
+    <div class="card monitor-links">
+      <button class="link-btn sub-tab" data-view="admin-users">👥 Quản lý tài khoản</button>
+      <button class="link-btn sub-tab" data-view="admin-dashboard">📊 Dashboard & Thống kê</button>
+    </div>
+
+    <!-- 1. Quản lý tài khoản -->
+    <section id="view-admin-users" class="view" style="display:none">
+      <h3 class="section-title">Quản lý tài khoản người dùng</h3>
+      <div class="card">
+        <div class="toolbar">
+          <div class="search-box">
+            <span class="icon">🔍</span>
+            <input type="text" id="adminUserSearch" placeholder="Tìm theo mã NV / họ tên">
+          </div>
+          <button class="btn btn-primary" id="btnOpenCreateUser">+ Tạo Tài Khoản</button>
+        </div>
+        <table class="grid-table">
+          <thead><tr>
+            <th style="width:50px">STT</th><th>Mã NV</th><th>Họ tên</th><th>Email</th>
+            <th style="width:170px">Vai trò</th><th style="width:130px">Trạng thái</th><th style="width:100px">Thao tác</th>
+          </tr></thead>
+          <tbody id="adminUsersBody"></tbody>
+        </table>
+        <div class="pagination" id="adminUsersPagination"></div>
+      </div>
+    </section>
+
+    <!-- 2. Dashboard & Thống kê -->
+    <section id="view-admin-dashboard" class="view" style="display:none">
+      <h3 class="section-title">Dashboard & Thống kê</h3>
+
+      <div class="dashboard-cards">
+        <div class="dashboard-card">
+          <div class="card-label">Phòng sử dụng nhiều nhất</div>
+          <div class="card-value" id="cardTopRoom">—</div>
+        </div>
+        <div class="dashboard-card">
+          <div class="card-label">Người tổ chức nhiều cuộc họp nhất</div>
+          <div class="card-value" id="cardTopOrganizer">—</div>
+        </div>
+      </div>
+
+      <h3 class="section-title">Số lượng cuộc họp theo tháng</h3>
+      <div class="card" style="margin-bottom:20px">
+        <div class="toolbar">
+          <label>Năm: <input type="number" id="dashboardYear" class="select-box" style="width:100px"></label>
+        </div>
+        <div id="monthChart"></div>
+      </div>
+
+      <h3 class="section-title">Hiệu suất sử dụng phòng</h3>
+      <div class="card">
+        <table class="grid-table">
+          <thead><tr><th style="width:50px">STT</th><th>Tên Phòng</th><th>Số cuộc họp</th><th>Tổng giờ sử dụng</th></tr></thead>
+          <tbody id="roomUsageBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+</main>
+
+<!-- =========================================================
+     MODAL: TẠO / SỬA PHÒNG HỌP (module Quản lý phòng họp)
+     ========================================================= -->
+<div class="modal-overlay" id="modalOverlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header" id="modalTitle">Tạo phòng họp</div>
+    <div class="modal-body">
+      <div class="form-group"><label>Mã phòng họp *</label><select id="fRoomCode" class="select-box full"></select></div>
+      <div class="form-group"><label>Tên phòng họp *</label><select id="fName" class="select-box full"></select></div>
+      <div class="form-group"><label>Số chỗ ngồi *</label><input type="number" id="fCapacity" placeholder="50" min="1"></div>
+      <div class="form-group">
+        <label>Thiết bị *</label>
+        <select id="fEquipment" class="select-box full" multiple size="5"></select>
+        <div class="hint">Giữ Ctrl (hoặc Cmd trên Mac) để chọn nhiều thiết bị</div>
+      </div>
+      <div class="form-group">
+        <label>Trạng thái phòng *</label>
+        <select id="fStatus" class="select-box full">
+          <option value="DANG_HOAT_DONG">Đang hoạt động</option>
+          <option value="BAO_TRI">Bảo trì</option>
+          <option value="NGUNG_HOAT_DONG">Ngừng hoạt động</option>
+        </select>
+      </div>
+      <div class="alert-box" id="deleteConfirmBox" style="display:none">
+        <div class="alert-title">⚠ Xóa phòng họp?</div>
+        <div class="alert-text">Bạn có chắc chắn muốn xóa phòng họp này khỏi hệ thống không? Hành động này không thể hoàn tác.</div>
+        <div class="alert-actions">
+          <button class="btn btn-danger" id="btnConfirmDelete">Chắc chắn</button>
+          <button class="btn btn-light" id="btnCancelDelete">Quay lại</button>
+        </div>
+      </div>
+      <div class="form-error" id="formError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btnSave">Lưu lại</button>
+      <button class="btn btn-danger" id="btnAskDelete" style="display:none">Xóa phòng</button>
+      <button class="btn btn-light" id="btnCancel">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     MODAL: TẠO TÀI KHOẢN (module Admin)
+     ========================================================= -->
+<div class="modal-overlay" id="createUserModal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">Tạo tài khoản người dùng</div>
+    <div class="modal-body">
+      <div class="form-group"><label>Mã nhân viên *</label><input id="newUserCode" placeholder="VD: NV_C"></div>
+      <div class="form-group"><label>Họ tên *</label><input id="newUserName" placeholder="Nguyễn Văn C"></div>
+      <div class="form-group"><label>Email</label><input id="newUserEmail" placeholder="email@xyz.com"></div>
+      <div class="form-group"><label>Mật khẩu *</label><input type="password" id="newUserPassword" placeholder="Ít nhất 6 ký tự"></div>
+      <div class="form-group">
+        <label>Vai trò *</label>
+        <select id="newUserRole" class="select-box full">
+          <option value="NHAN_VIEN">Nhân viên</option>
+          <option value="QUAN_LY_PHONG">Quản lý phòng họp</option>
+          <option value="ADMIN">Admin</option>
+        </select>
+      </div>
+      <div class="form-error" id="createUserError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="btnSaveCreateUser">Tạo tài khoản</button>
+      <button class="btn btn-light" id="btnCancelCreateUser">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Thứ tự nạp: common.js (điều hướng + phiên đăng nhập) trước, sau đó tới từng module -->
+<script src="common.js"></script>
+<script src="app.js"></script>
+<script src="employee.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
