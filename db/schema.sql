@@ -4,13 +4,13 @@
 -- Gom 3 module: Quan ly phong hop | Nhan vien | Admin
 -- =========================================================
 
-IF DB_ID('xyz_meeting_room') IS NULL
+IF DB_ID('xyz_meeting_room2') IS NULL
 BEGIN
-    CREATE DATABASE xyz_meeting_room;
+    CREATE DATABASE xyz_meeting_room2;
 END
 GO
 
-USE xyz_meeting_room;
+USE xyz_meeting_room2;
 GO
 
 IF OBJECT_ID('dbo.notifications', 'U') IS NOT NULL DROP TABLE dbo.notifications;
