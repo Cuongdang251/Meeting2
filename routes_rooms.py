@@ -43,7 +43,7 @@ def list_rooms():
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT r.id, r.room_code, r.name, r.capacity, r.admin_status,
+            SELECT r.id, r.room_code, r.name, r.capacity, r.description, r.admin_status,
                    COALESCE(STUFF((
                        SELECT ', ' + e.name
                        FROM dbo.room_equipment re
@@ -98,11 +98,18 @@ def create_room():
     room_code = (body.get("room_code") or "").strip()
     name = (body.get("name") or "").strip()
     capacity = body.get("capacity")
+    description = (body.get("description") or "").strip()
     equipment_ids = body.get("equipment_ids") or []
     admin_status = body.get("admin_status") or "DANG_HOAT_DONG"
 
     if not room_code or not name or not capacity:
         return bad_request("Vui lòng nhập đầy đủ Mã phòng, Tên phòng và Số chỗ ngồi.")
+    if len(room_code) > 20:
+        return bad_request("Mã phòng không được vượt quá 20 ký tự.")
+    if len(name) > 150:
+        return bad_request("Tên phòng không được vượt quá 150 ký tự.")
+    if len(description) > 500:
+        return bad_request("Mô tả phòng không được vượt quá 500 ký tự.")
     try:
         capacity = int(capacity)
         if capacity <= 0:
@@ -121,9 +128,9 @@ def create_room():
             return bad_request(f'Mã phòng "{room_code}" đã tồn tại.')
 
         cur.execute(
-            "INSERT INTO dbo.rooms (room_code, name, capacity, admin_status) "
-            "OUTPUT INSERTED.id VALUES (?, ?, ?, ?)",
-            room_code, name, capacity, admin_status,
+            "INSERT INTO dbo.rooms (room_code, name, capacity, description, admin_status) "
+            "OUTPUT INSERTED.id VALUES (?, ?, ?, ?, ?)",
+            room_code, name, capacity, description, admin_status,
         )
         new_id = cur.fetchone()[0]
         for eq_id in equipment_ids:
@@ -147,11 +154,16 @@ def update_room(room_id):
     body = request.get_json(force=True) or {}
     name = (body.get("name") or "").strip()
     capacity = body.get("capacity")
+    description = (body.get("description") or "").strip()
     equipment_ids = body.get("equipment_ids") or []
     admin_status = body.get("admin_status")
 
     if not name or not capacity:
         return bad_request("Vui lòng nhập đầy đủ Tên phòng và Số chỗ ngồi.")
+    if len(name) > 150:
+        return bad_request("Tên phòng không được vượt quá 150 ký tự.")
+    if len(description) > 500:
+        return bad_request("Mô tả phòng không được vượt quá 500 ký tự.")
     try:
         capacity = int(capacity)
         if capacity <= 0:
@@ -167,11 +179,11 @@ def update_room(room_id):
         cur.execute(
             """
             UPDATE dbo.rooms
-               SET name = ?, capacity = ?, admin_status = COALESCE(?, admin_status),
+               SET name = ?, capacity = ?, description = ?, admin_status = COALESCE(?, admin_status),
                    updated_at = SYSDATETIME()
              WHERE id = ? AND is_deleted = 0
             """,
-            name, capacity, admin_status, room_id,
+            name, capacity, description, admin_status, room_id,
         )
         if cur.rowcount == 0:
             conn.close()
@@ -391,31 +403,6 @@ def room_options():
         return server_error(err)
 
 
-@rooms_bp.route("/codes/available", methods=["GET"])
-def available_room_codes():
-    import os
-    pool_size = int(os.getenv("ROOM_CODE_POOL_SIZE", 20))
-    candidate_codes = [f"PH{str(i).zfill(3)}" for i in range(1, pool_size + 1)]
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT room_code FROM dbo.rooms WHERE is_deleted = 0")
-        used_codes = {row[0] for row in cur.fetchall()}
-        conn.close()
-        return jsonify({"success": True, "data": [c for c in candidate_codes if c not in used_codes]})
-    except Exception as err:
-        return server_error(err)
-
-
-@rooms_bp.route("/names/suggestions", methods=["GET"])
-def room_name_suggestions():
-    suggestions = [
-        "Phòng họp A", "Phòng họp B", "Phòng họp C", "Phòng họp D",
-        "Phòng Sáng Tạo", "Phòng Công Nghệ", "Phòng Hội Nghị", "Phòng Đa Năng",
-    ]
-    return jsonify({"success": True, "data": suggestions})
-
-
 @rooms_bp.route("/<int:room_id>/equipment", methods=["GET"])
 def room_equipment(room_id):
     try:
@@ -435,7 +422,7 @@ def get_room(room_id):
         conn = get_connection()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, room_code, name, capacity, admin_status FROM dbo.rooms "
+            "SELECT id, room_code, name, capacity, description, admin_status FROM dbo.rooms "
             "WHERE id = ? AND is_deleted = 0",
             room_id,
         )
@@ -453,13 +440,22 @@ def get_room(room_id):
 # =================================================================
 equipment_bp = Blueprint("equipment", __name__, url_prefix="/api/equipment")
 
+EQUIPMENT_STATUS_LABEL = {
+    "DANG_HOAT_DONG": "Đang hoạt động",
+    "BAO_TRI": "Bảo trì",
+    "NGUNG_HOAT_DONG": "Ngừng hoạt động",
+}
+
 
 @equipment_bp.route("/options", methods=["GET"])
 def equipment_options():
+    """Danh sách rút gọn (id, name) dùng cho ô multi-select chọn thiết bị của phòng."""
     try:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("SELECT id, name FROM dbo.equipment ORDER BY name")
+        cur.execute(
+            "SELECT id, name FROM dbo.equipment WHERE is_deleted = 0 ORDER BY name"
+        )
         rows = dict_rows(cur)
         conn.close()
         return jsonify({"success": True, "data": rows})

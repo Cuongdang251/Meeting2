@@ -168,7 +168,7 @@
         <table class="grid-table">
           <thead><tr>
             <th style="width:50px">STT</th><th>Mã Phòng</th><th>Tên Phòng</th>
-            <th>Số Chỗ Ngồi</th><th>Thiết Bị</th><th style="width:110px">Trạng Thái</th><th style="width:130px">Thao Tác</th>
+            <th>Số Chỗ Ngồi</th><th>Thiết Bị</th><th>Mô Tả Phòng</th><th style="width:110px">Trạng Thái</th><th style="width:130px">Thao Tác</th>
           </tr></thead>
           <tbody id="roomTableBody"></tbody>
         </table>
@@ -308,13 +308,17 @@
   <div class="modal">
     <div class="modal-header" id="modalTitle">Tạo phòng họp</div>
     <div class="modal-body">
-      <div class="form-group"><label>Mã phòng họp *</label><select id="fRoomCode" class="select-box full"></select></div>
-      <div class="form-group"><label>Tên phòng họp *</label><select id="fName" class="select-box full"></select></div>
+      <div class="form-group"><label>Mã phòng họp *</label><input type="text" id="fRoomCode" placeholder="VD: PH001" maxlength="20"></div>
+      <div class="form-group"><label>Tên phòng họp *</label><input type="text" id="fName" placeholder="VD: Phòng Sáng Tạo" maxlength="150"></div>
       <div class="form-group"><label>Số chỗ ngồi *</label><input type="number" id="fCapacity" placeholder="50" min="1"></div>
       <div class="form-group">
         <label>Thiết bị *</label>
         <select id="fEquipment" class="select-box full" multiple size="5"></select>
         <div class="hint">Giữ Ctrl (hoặc Cmd trên Mac) để chọn nhiều thiết bị</div>
+      </div>
+      <div class="form-group">
+        <label>Mô tả phòng</label>
+        <textarea id="fDescription" class="select-box full" rows="3" maxlength="500" placeholder="Ghi chú thêm về phòng họp (không bắt buộc, tối đa 500 ký tự)"></textarea>
       </div>
       <div class="form-group">
         <label>Trạng thái phòng *</label>

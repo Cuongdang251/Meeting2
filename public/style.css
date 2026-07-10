@@ -168,3 +168,25 @@ body {
 
 /* ---------- Sub-nav (module con) ---------- */
 .main-tab.active { border-bottom: 2px solid #fff; opacity: 1; font-weight: 600; }
+
+/* ---------- Hộp thoại thông báo thành công/lỗi (mockup 13-16) ---------- */
+.notify-overlay { z-index: 200; }
+.notify-box {
+  background: #fff; border-radius: 6px; padding: 32px 28px; width: 320px;
+  text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+.notify-icon {
+  width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 28px; font-weight: 700;
+}
+.notify-icon-success { background: #4CAF50; }
+.notify-icon-error { background: #E53935; }
+.notify-message { font-size: 14px; font-weight: 600; color: #222; margin-bottom: 18px; white-space: pre-line; }
+.notify-ok { min-width: 90px; }
+
+/* ---------- Ô "Không tìm thấy dữ liệu" (mockup 12) ---------- */
+.empty-state-row td { border: none !important; padding: 30px 0 !important; }
+.empty-state-box { text-align: center; padding: 20px; }
+.empty-state-icon { font-size: 34px; opacity: 0.5; margin-bottom: 10px; }
+.empty-state-text { color: #666; font-size: 14px; margin-bottom: 14px; }

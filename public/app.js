@@ -34,11 +34,31 @@ function canManageRooms() {
   return currentUser && (currentUser.role === 'QUAN_LY_PHONG' || currentUser.role === 'ADMIN');
 }
 
+function renderRoomStatusPill(r) {
+  // Ưu tiên hiển thị trạng thái hoạt động (Bảo trì / Ngừng hoạt động) nếu
+  // người quản lý đã đặt khác "Đang hoạt động"; chỉ khi phòng đang hoạt động
+  // bình thường mới hiển thị trạng thái trống/bận tính theo lịch họp hiện tại.
+  if (r.admin_status !== 'DANG_HOAT_DONG') {
+    return `<span class="status-pill ${ADMIN_STATUS_CLASS[r.admin_status]}">${ADMIN_STATUS_LABEL[r.admin_status]}</span>`;
+  }
+  return `<span class="status-pill ${OCC_CLASS[r.occupancy_status]}">${OCC_LABEL[r.occupancy_status]}</span>`;
+}
+
 function renderRoomTable(rooms) {
   const tbody = document.getElementById('roomTableBody');
   tbody.innerHTML = '';
   const canManage = canManageRooms();
   document.getElementById('btnOpenAdd').style.display = canManage ? 'inline-block' : 'none';
+
+  if (!rooms.length) {
+    tbody.innerHTML = emptyStateRow(8, 'Không tìm thấy phòng họp phù hợp', () => {
+      document.getElementById('searchInput').value = '';
+      state.roomSearch = ''; state.roomPage = 1;
+      loadRooms();
+    });
+    document.getElementById('roomPagination').innerHTML = '';
+    return;
+  }
 
   rooms.forEach((r, idx) => {
     const tr = document.createElement('tr');
@@ -48,7 +68,8 @@ function renderRoomTable(rooms) {
       <td>${escapeHtml(r.name)}</td>
       <td>${r.capacity} chỗ</td>
       <td>${escapeHtml(r.equipment || '')}</td>
-      <td><span class="status-pill ${OCC_CLASS[r.occupancy_status]}">${OCC_LABEL[r.occupancy_status]}</span></td>
+      <td>${escapeHtml(r.description || '')}</td>
+      <td>${renderRoomStatusPill(r)}</td>
       <td class="row-actions">
         ${canManage ? `<button onclick="openEditModal(${r.id})">Chỉnh sửa</button>` : '<span style="color:#999">Chỉ xem</span>'}
       </td>`;
@@ -57,7 +78,7 @@ function renderRoomTable(rooms) {
   for (let i = rooms.length; i < 8; i++) {
     const tr = document.createElement('tr');
     tr.className = 'empty-row';
-    tr.innerHTML = `<td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+    tr.innerHTML = `<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
     tbody.appendChild(tr);
   }
 }
@@ -109,28 +130,6 @@ const btnAskDelete = document.getElementById('btnAskDelete');
 document.getElementById('btnOpenAdd').addEventListener('click', openAddModal);
 document.getElementById('btnCancel').addEventListener('click', closeModal);
 
-// --- 8. Nạp danh sách "Mã phòng họp" còn trống (PH001..PH00N) ---
-async function populateRoomCodeSelect(selectedCode) {
-  const res = await fetch(`${API}/rooms/codes/available`);
-  const json = await res.json();
-  const options = [...json.data];
-  if (selectedCode && !options.includes(selectedCode)) options.unshift(selectedCode);
-  fRoomCode.innerHTML = `<option value="">-- Chọn mã phòng --</option>` +
-    options.map(c => `<option value="${c}">${c}</option>`).join('');
-  if (selectedCode) fRoomCode.value = selectedCode;
-}
-
-// --- 9. Nạp gợi ý "Tên phòng họp" ---
-async function populateRoomNameSelect(selectedName) {
-  const res = await fetch(`${API}/rooms/names/suggestions`);
-  const json = await res.json();
-  const options = [...json.data];
-  if (selectedName && !options.includes(selectedName)) options.unshift(selectedName);
-  fName.innerHTML = `<option value="">-- Chọn tên phòng --</option>` +
-    options.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-  if (selectedName) fName.value = selectedName;
-}
-
 // --- 10. Nạp danh mục "Thiết bị" (multi-select) ---
 async function populateEquipmentSelect(selectedIds = []) {
   const res = await fetch(`${API}/equipment/options`);
@@ -144,17 +143,18 @@ function getSelectedEquipmentIds() {
   return Array.from(fEquipment.selectedOptions).map(o => parseInt(o.value));
 }
 
-async function openAddModal() {
+function openAddModal() {
   state.modalMode = 'add';
   state.editingRoomId = null;
   modalTitle.textContent = 'Tạo phòng họp';
 
-  await populateRoomCodeSelect();
-  await populateRoomNameSelect();
-  await populateEquipmentSelect([]);
+  populateEquipmentSelect([]);
 
   fRoomCode.disabled = false;
+  fRoomCode.value = '';
+  fName.value = '';
   fCapacity.value = '';
+  document.getElementById('fDescription').value = '';
   fStatus.value = 'DANG_HOAT_DONG';
   formError.textContent = '';
   deleteConfirmBox.style.display = 'none';
@@ -176,12 +176,13 @@ window.openEditModal = async function (roomId) {
   const room = roomRes.data;
   const selectedEquipIds = equipRes.data || [];
 
-  await populateRoomCodeSelect(room.room_code);
-  await populateRoomNameSelect(room.name);
   await populateEquipmentSelect(selectedEquipIds);
 
   fRoomCode.disabled = true; // không đổi mã phòng khi sửa
+  fRoomCode.value = room.room_code;
+  fName.value = room.name;
   fCapacity.value = room.capacity;
+  document.getElementById('fDescription').value = room.description || '';
   fStatus.value = room.admin_status;
 
   formError.textContent = '';
@@ -196,7 +197,7 @@ btnSave.addEventListener('click', async () => {
   const capacity = parseInt(fCapacity.value);
   const equipmentIds = getSelectedEquipmentIds();
 
-  if (!fRoomCode.value || !fName.value || !capacity) {
+  if (!fRoomCode.value.trim() || !fName.value.trim() || !capacity) {
     formError.textContent = 'Vui lòng chọn/nhập đầy đủ thông tin bắt buộc (*).';
     return;
   }
@@ -205,16 +206,20 @@ btnSave.addEventListener('click', async () => {
     return;
   }
 
+  const isAdd = state.modalMode === 'add';
+  const description = document.getElementById('fDescription').value.trim();
+  const roomCodeValue = fRoomCode.value.trim();
+  const roomNameValue = fName.value.trim();
   try {
     let res;
-    if (state.modalMode === 'add') {
+    if (isAdd) {
       res = await fetch(`${API}/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          room_code: fRoomCode.value,
-          name: fName.value,
-          capacity, equipment_ids: equipmentIds,
+          room_code: roomCodeValue,
+          name: roomNameValue,
+          capacity, description, equipment_ids: equipmentIds,
           admin_status: fStatus.value
         })
       });
@@ -223,14 +228,19 @@ btnSave.addEventListener('click', async () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: fName.value, capacity,
+          name: roomNameValue, capacity, description,
           equipment_ids: equipmentIds, admin_status: fStatus.value
         })
       });
     }
     const json = await res.json();
-    if (!json.success) { formError.textContent = json.message; return; }
+    if (!json.success) {
+      closeModal();
+      showNotify('error', json.message);
+      return;
+    }
     closeModal();
+    showNotify('success', isAdd ? 'Thêm phòng họp thành công!' : 'Cập nhật thông tin phòng họp thành công!');
     loadRooms();
   } catch (err) {
     formError.textContent = 'Lỗi kết nối máy chủ.';
@@ -242,8 +252,9 @@ document.getElementById('btnCancelDelete').addEventListener('click', () => { del
 document.getElementById('btnConfirmDelete').addEventListener('click', async () => {
   const res = await fetch(`${API}/rooms/${state.editingRoomId}`, { method: 'DELETE' });
   const json = await res.json();
-  if (!json.success) { formError.textContent = json.message; deleteConfirmBox.style.display = 'none'; return; }
   closeModal();
+  if (!json.success) { showNotify('error', json.message); return; }
+  showNotify('success', 'Đã xóa phòng họp thành công!');
   loadRooms();
 });
 

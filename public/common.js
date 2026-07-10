@@ -149,4 +149,48 @@ window.escapeHtmlCommon = escapeHtmlCommon;
 window.API = API;
 window.switchView = switchView;
 
+// ---------------------------------------------------------------
+// HỘP THOẠI THÔNG BÁO THÀNH CÔNG / LỖI (dùng chung mọi module)
+// ---------------------------------------------------------------
+function showNotify(type, message, onOk) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay notify-overlay';
+  overlay.innerHTML = `
+    <div class="notify-box">
+      <div class="notify-icon ${type === 'success' ? 'notify-icon-success' : 'notify-icon-error'}">
+        ${type === 'success' ? '✓' : '!'}
+      </div>
+      <div class="notify-message">${escapeHtmlCommon(message)}</div>
+      <button class="btn btn-primary notify-ok">OK</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => {
+    overlay.remove();
+    if (onOk) onOk();
+  };
+  overlay.querySelector('.notify-ok').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+window.showNotify = showNotify;
+
+// ---------------------------------------------------------------
+// Ô "Không tìm thấy dữ liệu" dùng chung cho các bảng có tìm kiếm
+// ---------------------------------------------------------------
+function emptyStateRow(colspan, message, onRefresh) {
+  const btnId = 'emptyRefresh' + Math.random().toString(36).slice(2, 8);
+  setTimeout(() => {
+    const btn = document.getElementById(btnId);
+    if (btn && onRefresh) btn.addEventListener('click', onRefresh);
+  }, 0);
+  return `
+    <tr class="empty-state-row"><td colspan="${colspan}">
+      <div class="empty-state-box">
+        <div class="empty-state-icon">📄🔍</div>
+        <div class="empty-state-text">${escapeHtmlCommon(message)}</div>
+        <button class="btn btn-primary" id="${btnId}">Làm mới</button>
+      </div>
+    </td></tr>`;
+}
+window.emptyStateRow = emptyStateRow;
+
 checkSession();
