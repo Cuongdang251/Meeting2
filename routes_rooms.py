@@ -440,22 +440,14 @@ def get_room(room_id):
 # =================================================================
 equipment_bp = Blueprint("equipment", __name__, url_prefix="/api/equipment")
 
-EQUIPMENT_STATUS_LABEL = {
-    "DANG_HOAT_DONG": "Đang hoạt động",
-    "BAO_TRI": "Bảo trì",
-    "NGUNG_HOAT_DONG": "Ngừng hoạt động",
-}
-
 
 @equipment_bp.route("/options", methods=["GET"])
 def equipment_options():
-    """Danh sách rút gọn (id, name) dùng cho ô multi-select chọn thiết bị của phòng."""
+    """Danh sách thiết bị (id, name) dùng cho ô multi-select chọn thiết bị của phòng."""
     try:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute(
-            "SELECT id, name FROM dbo.equipment WHERE is_deleted = 0 ORDER BY name"
-        )
+        cur.execute("SELECT id, name FROM dbo.equipment ORDER BY name")
         rows = dict_rows(cur)
         conn.close()
         return jsonify({"success": True, "data": rows})

@@ -132,11 +132,21 @@ document.getElementById('btnCancel').addEventListener('click', closeModal);
 
 // --- 10. Nạp danh mục "Thiết bị" (multi-select) ---
 async function populateEquipmentSelect(selectedIds = []) {
-  const res = await fetch(`${API}/equipment/options`);
-  const json = await res.json();
-  fEquipment.innerHTML = json.data.map(e =>
-    `<option value="${e.id}" ${selectedIds.includes(e.id) ? 'selected' : ''}>${escapeHtml(e.name)}</option>`
-  ).join('');
+  try {
+    const res = await fetch(`${API}/equipment/options`);
+    const json = await res.json();
+    if (!json.success) {
+      fEquipment.innerHTML = '';
+      formError.textContent = 'Không tải được danh sách thiết bị: ' + (json.message || 'Lỗi không xác định.');
+      return;
+    }
+    fEquipment.innerHTML = json.data.map(e =>
+      `<option value="${e.id}" ${selectedIds.includes(e.id) ? 'selected' : ''}>${escapeHtml(e.name)}</option>`
+    ).join('');
+  } catch (err) {
+    fEquipment.innerHTML = '';
+    formError.textContent = 'Không tải được danh sách thiết bị (lỗi kết nối máy chủ).';
+  }
 }
 
 function getSelectedEquipmentIds() {
@@ -167,29 +177,35 @@ window.openEditModal = async function (roomId) {
   state.modalMode = 'edit';
   state.editingRoomId = roomId;
   modalTitle.textContent = 'Chỉnh sửa thông tin phòng họp';
-
-  const [roomRes, equipRes] = await Promise.all([
-    fetch(`${API}/rooms/${roomId}`).then(r => r.json()),
-    fetch(`${API}/rooms/${roomId}/equipment`).then(r => r.json())
-  ]);
-  if (!roomRes.success) { alert(roomRes.message || 'Không tìm thấy phòng.'); return; }
-  const room = roomRes.data;
-  const selectedEquipIds = equipRes.data || [];
-
-  await populateEquipmentSelect(selectedEquipIds);
-
-  fRoomCode.disabled = true; // không đổi mã phòng khi sửa
-  fRoomCode.value = room.room_code;
-  fName.value = room.name;
-  fCapacity.value = room.capacity;
-  document.getElementById('fDescription').value = room.description || '';
-  fStatus.value = room.admin_status;
-
   formError.textContent = '';
   deleteConfirmBox.style.display = 'none';
   btnSave.style.display = 'inline-block';
   btnAskDelete.style.display = 'inline-block';
-  modalOverlay.style.display = 'flex';
+  modalOverlay.style.display = 'flex'; // mở modal trước, nạp dữ liệu sau (để không bị treo nếu có lỗi phụ)
+
+  try {
+    const [roomRes, equipRes] = await Promise.all([
+      fetch(`${API}/rooms/${roomId}`).then(r => r.json()),
+      fetch(`${API}/rooms/${roomId}/equipment`).then(r => r.json())
+    ]);
+    if (!roomRes.success) {
+      formError.textContent = roomRes.message || 'Không tìm thấy phòng.';
+      return;
+    }
+    const room = roomRes.data;
+    const selectedEquipIds = equipRes.data || [];
+
+    await populateEquipmentSelect(selectedEquipIds);
+
+    fRoomCode.disabled = true; // không đổi mã phòng khi sửa
+    fRoomCode.value = room.room_code;
+    fName.value = room.name;
+    fCapacity.value = room.capacity;
+    document.getElementById('fDescription').value = room.description || '';
+    fStatus.value = room.admin_status;
+  } catch (err) {
+    formError.textContent = 'Không tải được dữ liệu phòng họp (lỗi kết nối máy chủ).';
+  }
 };
 
 btnSave.addEventListener('click', async () => {
