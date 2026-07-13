@@ -43,7 +43,7 @@ def list_rooms():
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT r.id, r.room_code, r.name, r.capacity, r.description, r.admin_status,
+            SELECT r.id, r.room_code, r.name, r.capacity, r.description, r.admin_status, r.is_hidden,
                    COALESCE(STUFF((
                        SELECT ', ' + e.name
                        FROM dbo.room_equipment re
@@ -203,7 +203,7 @@ def update_room(room_id):
 
 
 # =================================================================
-# 4) XÓA PHÒNG HỌP
+# 4) XÓA PHÒNG HỌP — XÓA THẬT khỏi CSDL (không phải ẩn/soft-delete)
 # =================================================================
 @rooms_bp.route("/<int:room_id>", methods=["DELETE"])
 @login_required(roles=["QUAN_LY_PHONG", "ADMIN"])
@@ -211,6 +211,12 @@ def delete_room(room_id):
     try:
         conn = get_connection()
         cur = conn.cursor()
+
+        cur.execute("SELECT id FROM dbo.rooms WHERE id = ?", room_id)
+        if not cur.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "Không tìm thấy phòng họp."}), 404
+
         cur.execute(
             "SELECT COUNT(*) FROM dbo.meetings WHERE room_id = ? "
             "AND start_time > GETDATE() AND status = 'DA_XAC_NHAN'",
@@ -221,16 +227,57 @@ def delete_room(room_id):
             return bad_request(
                 "Không thể xóa: phòng đang có lịch họp sắp tới. Vui lòng hủy các lịch họp trước."
             )
+
+        # Xóa dữ liệu lịch sử liên quan đến phòng này (thông báo, người tham gia, cuộc họp)
         cur.execute(
-            "UPDATE dbo.rooms SET is_deleted = 1, updated_at = SYSDATETIME() WHERE id = ?",
+            "DELETE FROM dbo.notifications WHERE meeting_id IN "
+            "(SELECT id FROM dbo.meetings WHERE room_id = ?)",
             room_id,
+        )
+        cur.execute(
+            "DELETE FROM dbo.meeting_participants WHERE meeting_id IN "
+            "(SELECT id FROM dbo.meetings WHERE room_id = ?)",
+            room_id,
+        )
+        cur.execute("DELETE FROM dbo.meetings WHERE room_id = ?", room_id)
+        cur.execute("DELETE FROM dbo.room_equipment WHERE room_id = ?", room_id)
+
+        # Xóa thật dòng phòng khỏi bảng rooms
+        cur.execute("DELETE FROM dbo.rooms WHERE id = ?", room_id)
+
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Đã xóa phòng họp khỏi hệ thống."})
+    except Exception as err:
+        return server_error(err)
+
+
+# =================================================================
+# 4b) ẨN / HIỆN PHÒNG HỌP — chỉ ẩn khỏi giao diện Nhân viên, Quản lý phòng
+#     vẫn thấy để quản lý / hiện lại
+# =================================================================
+@rooms_bp.route("/<int:room_id>/visibility", methods=["PUT"])
+@login_required(roles=["QUAN_LY_PHONG", "ADMIN"])
+def toggle_room_visibility(room_id):
+    body = request.get_json(force=True) or {}
+    hidden = bool(body.get("hidden"))
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE dbo.rooms SET is_hidden = ?, updated_at = SYSDATETIME() "
+            "WHERE id = ? AND is_deleted = 0",
+            1 if hidden else 0, room_id,
         )
         if cur.rowcount == 0:
             conn.close()
             return jsonify({"success": False, "message": "Không tìm thấy phòng họp."}), 404
         conn.commit()
         conn.close()
-        return jsonify({"success": True, "message": "Đã xóa phòng họp."})
+        return jsonify({
+            "success": True,
+            "message": "Đã ẩn phòng họp khỏi Nhân viên." if hidden else "Đã hiện lại phòng họp.",
+        })
     except Exception as err:
         return server_error(err)
 
@@ -394,7 +441,7 @@ def room_options():
         cur = conn.cursor()
         cur.execute(
             "SELECT id, name, capacity FROM dbo.rooms "
-            "WHERE is_deleted = 0 AND admin_status = 'DANG_HOAT_DONG' ORDER BY name"
+            "WHERE is_deleted = 0 AND is_hidden = 0 AND admin_status = 'DANG_HOAT_DONG' ORDER BY name"
         )
         rows = dict_rows(cur)
         conn.close()

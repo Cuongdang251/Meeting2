@@ -24,15 +24,38 @@ let state = {
 // =====================================================================
 async function loadRooms() {
   const params = new URLSearchParams({ search: state.roomSearch, page: state.roomPage });
-  const res = await fetch(`${API}/rooms?${params}`);
-  const json = await res.json();
-  renderRoomTable(json.data);
-  renderPagination('roomPagination', json.pagination, p => { state.roomPage = p; loadRooms(); });
+  try {
+    const res = await fetch(`${API}/rooms?${params}`);
+    const json = await res.json();
+    if (!json.success) {
+      renderRoomTable([]);
+      document.getElementById('roomPagination').innerHTML = '';
+      showNotify('error', json.message || 'Không tải được danh sách phòng họp.');
+      return;
+    }
+    renderRoomTable(json.data);
+    renderPagination('roomPagination', json.pagination, p => { state.roomPage = p; loadRooms(); });
+  } catch (err) {
+    renderRoomTable([]);
+    showNotify('error', 'Không kết nối được máy chủ khi tải danh sách phòng.');
+  }
 }
 
 function canManageRooms() {
   return currentUser && (currentUser.role === 'QUAN_LY_PHONG' || currentUser.role === 'ADMIN');
 }
+
+window.toggleRoomVisibility = async function (roomId, hidden) {
+  const res = await fetch(`${API}/rooms/${roomId}/visibility`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hidden }),
+  });
+  const json = await res.json();
+  if (!json.success) { showNotify('error', json.message); return; }
+  showNotify('success', hidden ? 'Đã ẩn phòng họp khỏi Nhân viên.' : 'Đã hiện lại phòng họp.');
+  loadRooms();
+};
 
 function renderRoomStatusPill(r) {
   // Ưu tiên hiển thị trạng thái hoạt động (Bảo trì / Ngừng hoạt động) nếu
@@ -62,16 +85,20 @@ function renderRoomTable(rooms) {
 
   rooms.forEach((r, idx) => {
     const tr = document.createElement('tr');
+    if (r.is_hidden) tr.style.opacity = '0.55';
     tr.innerHTML = `
       <td>${(state.roomPage - 1) * 8 + idx + 1}</td>
       <td>${escapeHtml(r.room_code)}</td>
-      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.name)} ${r.is_hidden ? '<span class="status-pill status-ngung_hoat_dong">Đã ẩn</span>' : ''}</td>
       <td>${r.capacity} chỗ</td>
       <td>${escapeHtml(r.equipment || '')}</td>
       <td>${escapeHtml(r.description || '')}</td>
       <td>${renderRoomStatusPill(r)}</td>
       <td class="row-actions">
-        ${canManage ? `<button onclick="openEditModal(${r.id})">Chỉnh sửa</button>` : '<span style="color:#999">Chỉ xem</span>'}
+        ${canManage ? `
+          <button onclick="openEditModal(${r.id})">Chỉnh sửa</button>
+          <button onclick="toggleRoomVisibility(${r.id}, ${r.is_hidden ? 'false' : 'true'})">${r.is_hidden ? 'Hiện' : 'Ẩn'}</button>
+        ` : '<span style="color:#999">Chỉ xem</span>'}
       </td>`;
     tbody.appendChild(tr);
   });
@@ -282,10 +309,20 @@ function closeModal() { modalOverlay.style.display = 'none'; }
 async function loadUsageHistory() {
   await populateRoomFilter('usageRoomFilter');
   const params = new URLSearchParams({ room_id: state.usageRoomId, page: state.usagePage });
-  const res = await fetch(`${API}/rooms/usage-history?${params}`);
-  const json = await res.json();
-  renderHistoryTable('usageTableBody', json.data, state.usagePage);
-  renderPagination('usagePagination', json.pagination, p => { state.usagePage = p; loadUsageHistory(); });
+  try {
+    const res = await fetch(`${API}/rooms/usage-history?${params}`);
+    const json = await res.json();
+    if (!json.success) {
+      renderHistoryTable('usageTableBody', [], state.usagePage);
+      showNotify('error', json.message || 'Không tải được lịch sử sử dụng phòng.');
+      return;
+    }
+    renderHistoryTable('usageTableBody', json.data, state.usagePage);
+    renderPagination('usagePagination', json.pagination, p => { state.usagePage = p; loadUsageHistory(); });
+  } catch (err) {
+    renderHistoryTable('usageTableBody', [], state.usagePage);
+    showNotify('error', 'Không kết nối được máy chủ.');
+  }
 }
 document.getElementById('usageRoomFilter').addEventListener('change', e => {
   state.usageRoomId = e.target.value; state.usagePage = 1; loadUsageHistory();
@@ -300,10 +337,20 @@ async function loadBookingHistory() {
     room_id: state.bookingRoomId, page: state.bookingPage,
     from: state.bookingFrom, to: state.bookingTo
   });
-  const res = await fetch(`${API}/rooms/booking-history?${params}`);
-  const json = await res.json();
-  renderHistoryTable('bookingTableBody', json.data, state.bookingPage);
-  renderPagination('bookingPagination', json.pagination, p => { state.bookingPage = p; loadBookingHistory(); });
+  try {
+    const res = await fetch(`${API}/rooms/booking-history?${params}`);
+    const json = await res.json();
+    if (!json.success) {
+      renderHistoryTable('bookingTableBody', [], state.bookingPage);
+      showNotify('error', json.message || 'Không tải được lịch sử đặt phòng.');
+      return;
+    }
+    renderHistoryTable('bookingTableBody', json.data, state.bookingPage);
+    renderPagination('bookingPagination', json.pagination, p => { state.bookingPage = p; loadBookingHistory(); });
+  } catch (err) {
+    renderHistoryTable('bookingTableBody', [], state.bookingPage);
+    showNotify('error', 'Không kết nối được máy chủ.');
+  }
 }
 document.getElementById('bookingRoomFilter').addEventListener('change', e => {
   state.bookingRoomId = e.target.value; state.bookingPage = 1; loadBookingHistory();
@@ -369,9 +416,19 @@ function shiftDay(delta) {
 
 async function loadAvailability() {
   buildTimelineHeader();
-  const res = await fetch(`${API}/rooms/availability?date=${state.availDate}`);
-  const json = await res.json();
-  renderTimelineBody(json.data);
+  try {
+    const res = await fetch(`${API}/rooms/availability?date=${state.availDate}`);
+    const json = await res.json();
+    if (!json.success) {
+      renderTimelineBody([]);
+      showNotify('error', json.message || 'Không tải được dữ liệu thời gian trống.');
+      return;
+    }
+    renderTimelineBody(json.data);
+  } catch (err) {
+    renderTimelineBody([]);
+    showNotify('error', 'Không kết nối được máy chủ.');
+  }
 }
 
 function buildTimelineHeader() {
