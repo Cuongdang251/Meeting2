@@ -111,7 +111,7 @@ async function doLogin() {
   const password = document.getElementById('loginPassword').value;
   const errorEl = document.getElementById('loginError');
   errorEl.textContent = '';
-  if (!code || !password) { errorEl.textContent = 'Vui lòng nhập Mã nhân viên và Mật khẩu.'; return; }
+  if (!code || !password) { errorEl.textContent = 'Vui lòng nhập Tài khoản và Mật khẩu.'; return; }
 
   try {
     const res = await fetch(`${API}/auth/login`, {

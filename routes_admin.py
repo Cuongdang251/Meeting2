@@ -83,7 +83,7 @@ def create_user():
     role = body.get("role") or "NHAN_VIEN"
 
     if not code or not full_name or not password:
-        return bad_request("Vui lòng nhập đầy đủ Mã nhân viên, Họ tên và Mật khẩu.")
+        return bad_request("Vui lòng nhập đầy đủ Tên tài khoản, Họ tên và Mật khẩu.")
     if len(password) < 6:
         return bad_request("Mật khẩu phải có ít nhất 6 ký tự.")
     if role not in ROLE_LABEL:
@@ -95,7 +95,7 @@ def create_user():
         cur.execute("SELECT id FROM dbo.users WHERE code = ?", code)
         if cur.fetchone():
             conn.close()
-            return bad_request(f'Mã nhân viên "{code}" đã tồn tại.')
+            return bad_request(f'Tên tài khoản "{code}" đã tồn tại.')
 
         cur.execute(
             "INSERT INTO dbo.users (code, full_name, email, password_hash, role) "

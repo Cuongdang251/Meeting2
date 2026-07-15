@@ -39,7 +39,7 @@ def login():
     code = (body.get("code") or "").strip()
     password = body.get("password") or ""
     if not code or not password:
-        return bad_request("Vui lòng nhập Mã nhân viên và Mật khẩu.")
+        return bad_request("Vui lòng nhập Tên tài khoản và Mật khẩu.")
 
     try:
         conn = get_connection()
@@ -53,7 +53,7 @@ def login():
         conn.close()
 
         if not user or not check_password_hash(user["password_hash"], password):
-            return bad_request("Mã nhân viên hoặc mật khẩu không đúng.")
+            return bad_request("Tên tài khoản hoặc mật khẩu không đúng.")
         if user["is_locked"]:
             return bad_request("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.")
 
